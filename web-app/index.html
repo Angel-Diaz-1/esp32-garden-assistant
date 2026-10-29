@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Manual watering control for the ESP32 Garden Assistant." />
+    <title>Garden Assistant</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <!-- Defer waits until the HTML is ready before attaching the button listener. -->
+    <script src="./src/app.js" defer></script>
+  </head>
+  <body>
+    <main class="watering-card" aria-labelledby="page-title">
+      <span class="plant-mark" aria-hidden="true">&#127793;</span>
+      <p class="eyebrow">ESP32 GARDEN ASSISTANT</p>
+      <h1 id="page-title">A little care.<br />A greener day.</h1>
+      <p class="description">Your plant’s next drink is one tap away.</p>
+      <!-- A native button supports mouse, touch, Enter, and Space automatically. -->
+      <button id="water-button" type="button">water plant</button>
+      <!-- Live status announces click feedback to screen readers without moving focus. -->
+      <p id="watering-status" class="status" role="status" aria-live="polite">Demo mode · ESP32 not connected</p>
+    </main>
+  </body>
+</html>
