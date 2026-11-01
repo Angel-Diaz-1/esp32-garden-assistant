@@ -15,8 +15,21 @@
       <p class="eyebrow">ESP32 GARDEN ASSISTANT</p>
       <h1 id="page-title">A little care.<br />A greener day.</h1>
       <p class="description">Your plant’s next drink is one tap away.</p>
+      <button id="plant-type-toggle" class="plant-type-toggle" type="button" aria-pressed="false" aria-label="Switch to outdoor plant">
+        Plant type: Indoor
+      </button>
+      <section id="outdoor-settings" class="outdoor-settings" aria-label="Outdoor plant settings" hidden>
+        <label class="field-label" for="zip-code">Plant ZIP code</label>
+        <input id="zip-code" name="zip-code" type="text" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{5}" maxlength="5" placeholder="e.g. 90210" aria-describedby="zip-help" />
+        <p id="zip-help" class="field-help">US ZIP code, used to check current local rain.</p>
+        <label class="saving-option" for="water-saving-toggle">
+          <input id="water-saving-toggle" type="checkbox" />
+          <span>Water-saving mode</span>
+        </label>
+        <p class="field-help">Skip reservoir watering when rain is currently detected near your plant.</p>
+      </section>
       <!-- A native button supports mouse, touch, Enter, and Space automatically. -->
-      <button id="water-button" type="button">water plant</button>
+      <button id="water-button" class="water-button" type="button">water plant</button>
       <!-- Live status announces click feedback to screen readers without moving focus. -->
       <p id="watering-status" class="status" role="status" aria-live="polite">Demo mode · ESP32 not connected</p>
     </main>

@@ -7,6 +7,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none; }
 
 /* Center the control while allowing the page to scroll on smaller screens. */
 body {
@@ -25,7 +26,6 @@ body {
 h1 { font-family: Georgia, serif; font-size: clamp(38px, 8vw, 54px); font-weight: 400; line-height: 1.12; margin: 22px 0; }
 .description { color: #546757; line-height: 1.6; margin-bottom: 34px; }
 
-/* Large touch target; visible keyboard focus is kept distinct from hover. */
 button {
   width: 100%;
   max-width: 300px;
@@ -42,5 +42,38 @@ button:hover { background: #244f38; }
 button:active { transform: translateY(1px); }
 button:focus-visible { outline: 3px solid #203c2e; outline-offset: 5px; }
 button:disabled { opacity: .65; cursor: wait; }
+.plant-type-toggle {
+  min-height: 48px;
+  margin-bottom: 20px;
+  background: #e0ebd7;
+  color: #203c2e;
+  box-shadow: none;
+}
+.plant-type-toggle:hover { background: #d3e2c7; }
+.outdoor-settings {
+  max-width: 360px;
+  margin: 0 auto 24px;
+  padding: 18px;
+  border: 1px solid #d5e0d0;
+  border-radius: 14px;
+  text-align: left;
+}
+.field-label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+#zip-code {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #aebdab;
+  border-radius: 8px;
+  background: white;
+  color: #203c2e;
+  font: inherit;
+}
+#zip-code:focus-visible { outline: 3px solid #2e6547; outline-offset: 2px; }
+.field-help { margin: 7px 0 14px; color: #546757; font-size: 12px; line-height: 1.5; }
+.saving-option { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; }
+.saving-option input { width: 18px; height: 18px; accent-color: #2e6547; }
+.saving-option + .field-help { margin-bottom: 0; }
+.water-button { min-height: 60px; }
 /* Reserve feedback space so a click does not shift the button. */
 .status { min-height: 44px; margin: 22px auto 0; max-width: 320px; font-size: 13px; line-height: 1.6; color: #546757; }

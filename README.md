@@ -1,12 +1,12 @@
 # ESP32 Garden Assistant
 
-ESP32 based garden assistant for an embedded systems project, starting with manual watering.
+ESP32 based garden assistant for an embedded systems project, starting with manual watering and a rain-aware outdoor plant mode.
 
 ## Run the web app
 
 Open `web-app/index.html` in your browser. No installation or build step is required.
 
-The **water plant** button currently shows demo feedback. It does not contact an ESP32 or operate a pump.
+The **water plant** button currently shows demo feedback. It does not contact an ESP32 or operate a pump. Use the plant type button to switch between indoor and outdoor settings. For an outdoor plant, enabling water-saving mode checks the plant's US ZIP code against current rain from the free Open-Meteo API; if rain is detected, that watering cycle is skipped. ZIP-code lookup uses the free Zippopotam.us API. A weather lookup failure is reported and does not prevent normal watering.
 
 ## Project layout
 
@@ -26,4 +26,4 @@ Replace the demo implementation of `requestWatering()` in `web-app/src/app.js` w
 
 ## Manual check
 
-Open the page, press **water plant**, and confirm that it reports the ESP32 needs connecting. Tab to the button and activate it with Enter or Space. Check that the layout fits a phone screen.
+Open the page, press **water plant**, and confirm that it reports the ESP32 needs connecting. Switch to outdoor mode, enter a valid US ZIP code, enable water-saving mode, and confirm the page checks current rain before watering. Tab to the controls and activate them with Enter or Space. Check that the layout fits a phone screen.
