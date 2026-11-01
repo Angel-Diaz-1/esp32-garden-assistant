@@ -8,6 +8,8 @@ Open `web-app/index.html` in your browser. No installation or build step is requ
 
 The **water plant** button currently shows demo feedback. It does not contact an ESP32 or operate a pump. Use the plant type button to switch between indoor and outdoor settings. For an outdoor plant, enabling water-saving mode checks the plant's US ZIP code against current rain from the free Open-Meteo API; if rain is detected, that watering cycle is skipped. ZIP-code lookup uses the free Zippopotam.us API. A weather lookup failure is reported and does not prevent normal watering.
 
+The GitHub Actions workflow deploys `web-app/` to GitHub Pages after changes are pushed to `main` (or when manually triggered). Once deployment succeeds, the site is available at <https://angel-diaz-1.github.io/esp32-garden-assistant/>.
+
 ## Project layout
 
 ```text
