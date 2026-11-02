@@ -1,0 +1,19 @@
+name: Firmware checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test watering state machine
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror firmware/tests/watering_controller_test.cpp -o /tmp/watering-test
+          /tmp/watering-test
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32 core and compile NodeMCU-32S sketch
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.2 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli compile --fqbn esp32:esp32:nodemcu-32s firmware/garden_controller

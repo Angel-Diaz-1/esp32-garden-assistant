@@ -22,7 +22,11 @@ web-app/
 
 As those components are implemented, add `firmware/garden_controller/` for ESP32 code, `server/` for the device API, `hardware/` for wiring, and `docs/` for team documentation. Static assets can go in `web-app/public/` when needed.
 
-## Connecting the ESP32 later
+## Test the ESP32 without a pump
+
+Open `firmware/garden_controller/garden_controller.ino` in Arduino IDE and follow the [dry-run guide](docs/watering-dry-run.md). Serial Monitor commands simulate a timed watering cycle without driving GPIO. Firmware checks test the shared control logic and compile the ESP32 sketch in GitHub Actions. The website remains a separate demo until a device API is added.
+
+## Connecting the web app to the ESP32 later
 
 Replace the demo implementation of `requestWatering()` in `web-app/src/app.js` with a request to the watering API. The UI already handles pending requests and errors. Confirm device acknowledgement before reporting success; pump duration and safety limits should be enforced by the controller.
 
