@@ -24,6 +24,8 @@ As those components are implemented, add `firmware/garden_controller/` for ESP32
 
 ## Connecting the ESP32 later
 
+For a standalone Wi-Fi connection test, open `firmware/wifi_connectivity_test/wifi_connectivity_test.ino` and follow the [Wi-Fi test guide](docs/wifi-connectivity-test.md). It reports connection status in Serial Monitor and provides a local HTTP endpoint for a browser test. Keep actual credentials in the ignored `wifi_secrets.h` file.
+
 Replace the demo implementation of `requestWatering()` in `web-app/src/app.js` with a request to the watering API. The UI already handles pending requests and errors. Confirm device acknowledgement before reporting success; pump duration and safety limits should be enforced by the controller.
 
 ## Manual check
