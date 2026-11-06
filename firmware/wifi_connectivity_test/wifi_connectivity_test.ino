@@ -28,6 +28,24 @@ void setup() {
   lastRetry = millis();
   Serial.println("\nConnecting to Wi-Fi...");
 
+  // Read-only health endpoint for the separate GitHub Pages website.
+  // It exposes no credentials and does not operate any hardware.
+  server.on("/api/status", HTTP_GET, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json",
+      String("{\"device\":\"garden-assistant-esp32\",\"connected\":") +
+      (WiFi.status() == WL_CONNECTED ? "true" : "false") +
+      ",\"wateringAvailable\":false}");
+  });
+  // Some browsers preflight requests to private network devices.
+  server.on("/api/status", HTTP_OPTIONS, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Private-Network", "true");
+    server.send(204);
+  });
+
   server.on("/", HTTP_GET, []() {
     server.sendHeader("Cache-Control", "no-store");
     server.send(200, "text/plain",
