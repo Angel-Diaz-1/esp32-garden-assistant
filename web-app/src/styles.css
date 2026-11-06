@@ -7,6 +7,14 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Connection feedback uses text as well as color for accessible status. */
+.board-settings { margin: 24px auto 12px; max-width: 300px; text-align: left; }
+.board-settings label { display: block; font-size: 14px; margin-bottom: 8px; }
+.board-settings input { width: 100%; padding: 12px; border: 1px solid #718575; border-radius: 8px; font: inherit; margin-bottom: 10px; }
+.board-status { font-size: 14px; line-height: 1.5; min-height: 42px; }
+.board-status[data-state="connected"] { color: #245b37; font-weight: 700; }
+.board-status[data-state="disconnected"] { color: #70442b; }
 [hidden] { display: none; }
 
 /* Center the control while allowing the page to scroll on smaller screens. */
