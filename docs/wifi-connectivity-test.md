@@ -40,11 +40,11 @@ Campus Wi-Fi may isolate devices even when both have internet access. If the boa
 1. Keep the pump submerged in water with its outlet directed into a container. Keep the ESP32 and driver dry. Verify wiring and 5 V output, then enable the supply.
 2. Open the board's `http://<board-ip>/` address on the same Wi-Fi network. The page now includes **Turn pump ON** and **Turn pump OFF** buttons. It reports the commanded output state, not measured water flow. Refresh the page to update its state after an automatic stop or Serial command.
 3. Click ON: the pump should run immediately. Click OFF: it should stop immediately.
-4. Click ON again and wait: it should stop automatically after about **10 seconds**. Repeated ON commands while running do not extend this timer. There is no long watering delay blocking Wi-Fi processing.
-5. Serial Monitor at **115200 baud** also works: send **1** for ON or **0** for OFF. Newline characters are ignored. Serial commands work even before Wi-Fi connects, and have the same 10-second limit.
+4. Click ON again and wait: it should stop automatically after about **30 seconds**. Repeated ON commands while running do not extend this timer. There is no long watering delay blocking Wi-Fi processing.
+5. Serial Monitor at **115200 baud** also works: send **1** for ON or **0** for OFF. Newline characters are ignored. Serial commands work even before Wi-Fi connects, and have the same 30-second limit.
 6. Reset the board: it should remain OFF until a new command. Losing an established Wi-Fi connection also stops the pump; reconnecting does not restart it. A new Serial ON command can still be used while offline.
 
-`kPumpPin` and `kMaxPumpRunMs` near the top of the sketch set the GPIO and maximum run time. The 10-second stop is a software safeguard, not a hardware guarantee: if the processor hangs or a driver fails, switch off the pump power supply. Initial hardware tests should be supervised.
+`kPumpPin` and `kMaxPumpRunMs` near the top of the sketch set the GPIO and maximum run time. The 30-second stop is a software safeguard, not a hardware guarantee: if the processor hangs or a driver fails, switch off the pump power supply. Initial hardware tests should be supervised.
 
 The local control page has no login and is intended for a trusted local network. Do not expose it with router port forwarding. The separate GitHub Pages **water plant** button remains a demo; use the board's own page for actual control. `/pump/on` and `/pump/off` accept POST requests, not clickable GET links. The read-only `/api/status` endpoint additionally reports `pumpOn` while retaining `wateringAvailable: false` for compatibility with the separate website.
 

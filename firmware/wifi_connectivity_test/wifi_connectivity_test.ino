@@ -25,7 +25,7 @@ bool previouslyConnected = false;
 
 // NodeMCU-32S / classic ESP32: GPIO25 goes to the Adafruit driver's In.
 constexpr uint8_t kPumpPin = 25;
-constexpr unsigned long kMaxPumpRunMs = 10000;
+constexpr unsigned long kMaxPumpRunMs = 30000;
 bool pumpOn = false;
 unsigned long pumpStartedAt = 0;
 
@@ -41,13 +41,13 @@ void startPump() {
   pumpStartedAt = millis();
   pumpOn = true;
   digitalWrite(kPumpPin, HIGH);
-  Serial.println("Pump ON (maximum 10 seconds)");
+  Serial.println("Pump ON (maximum 30 seconds)");
 }
 
 void servicePump() {
   if (pumpOn && millis() - pumpStartedAt >= kMaxPumpRunMs) {
     stopPump();
-    Serial.println("Automatic stop: 10-second limit reached.");
+    Serial.println("Automatic stop: 30-second limit reached.");
   }
 }
 
@@ -58,7 +58,7 @@ void sendPumpPage() {
     "<p>PASS: Your browser reached the ESP32 over local Wi-Fi!</p>"
     "<p>Commanded pump state: <strong>");
   page += pumpOn ? "ON" : "OFF";
-  page += F("</strong></p><p>ON runs for up to 10 seconds. "
+  page += F("</strong></p><p>ON runs for up to 30 seconds. "
     "Keep the pump submerged. Refresh to update the displayed state.</p>"
     "<form method='post' action='/pump/on'><button>Turn pump ON</button></form>"
     "<br><form method='post' action='/pump/off'><button>Turn pump OFF</button></form>"
