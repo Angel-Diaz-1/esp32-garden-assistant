@@ -3,9 +3,9 @@
 #include <HTTPClient.h>
 
 const char* ssid = "eduroam";
-#define EAP_ID "danielrodrig2023@fau.edu"
-#define EAP_USERNAME "danielrodrig2023@fau.edu"
-#define EAP_PASSWORD "Astolfo69@"
+#define EAP_ID "USER_ID"
+#define EAP_USERNAME "USER_ID"
+#define EAP_PASSWORD "USER_PASSWORD"
 const char* serverName = "https://angel-diaz-1.github.io/esp32-garden-assistant/";
 
 void setup() {
