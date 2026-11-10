@@ -1,13 +1,19 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
-// Copy wifi_secrets.example.h to wifi_secrets.h and enter credentials locally.
-// CI uses the example values only to verify compilation, not network access.
-#if __has_include("wifi_secrets.h")
-#include "wifi_secrets.h"
-#else
-#include "wifi_secrets.example.h"
-#endif
+// School Wi-Fi (WPA2-Enterprise PEAP). Edit these in your LOCAL copy only.
+// This sketch is self-contained: no wifi_secrets header is required.
+// Keep real school credentials out of commits, screenshots, and shared files.
+constexpr const char* WIFI_NAME = "eduroam";
+constexpr const char* EAP_IDENTITY = "USER_ID";  // Outer identity: follow school IT instructions.
+constexpr const char* EAP_USERNAME = "USER_ID";  // Often the full school email/user ID.
+constexpr const char* EAP_PASSWORD = "USER_PASSWORD";
+
+// Set to the school's IT-provided root CA PEM text to validate its server.
+// nullptr is the certificate-free example; it does NOT verify the server.
+// Obtain the correct certificate and EAP settings from school IT before
+// using real credentials. A PEM can be pasted here as R"PEM(...)PEM".
+constexpr const char* EAP_CA_CERT = nullptr;
 
 // The local HTTP endpoint lets a second device verify communication with ESP32.
 WebServer server(80);
@@ -78,7 +84,10 @@ void setup() {
   // Station mode joins an existing network instead of creating an access point.
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
+  // Arduino-ESP32 3.x configures Enterprise auth through WiFi.begin().
+  // No legacy esp_wpa2.h include is needed.
+  WiFi.begin(WIFI_NAME, WPA2_AUTH_PEAP, EAP_IDENTITY, EAP_USERNAME,
+             EAP_PASSWORD, EAP_CA_CERT);
   lastRetry = millis();
   Serial.println("\nConnecting to Wi-Fi...");
 

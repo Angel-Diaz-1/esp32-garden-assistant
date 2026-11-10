@@ -23,13 +23,17 @@ References: [Adafruit pinouts](https://learn.adafruit.com/adafruit-mosfet-driver
 
 ## Upload and connect
 
-1. Copy `firmware/wifi_connectivity_test/wifi_secrets.example.h` to `wifi_secrets.h` in the same directory. Enter your Wi-Fi name and password in that local copy. Git ignores `wifi_secrets.h`; never put credentials into the example file.
-2. Open `firmware/wifi_connectivity_test/wifi_connectivity_test.ino` in Arduino IDE. Use **esp32 by Espressif Systems**, select **NodeMCU-32S**, and select the connected COM port. The WiFi and WebServer libraries are included with this core.
-3. Use a 2.4 GHz network with a normal Wi-Fi password. Enterprise authentication and captive portal login are outside this example's scope.
+1. Open `firmware/wifi_connectivity_test/wifi_connectivity_test.ino` in Arduino IDE. The sketch now contains its settings directly and requires no `wifi_secrets.h` or `wifi_secrets.example.h`. Copying the entire `.ino` into a new Arduino sketch also works.
+2. Use **esp32 by Espressif Systems**, version **3.3.2** (the version checked by CI), select **NodeMCU-32S**, and select the connected COM port. WiFi and WebServer are included with this core. The modern Enterprise API does not require the legacy `esp_wpa2.h` header.
+3. At the top of your **local copy**, set `WIFI_NAME` (defaults to `eduroam`), `EAP_IDENTITY`, `EAP_USERNAME`, and `EAP_PASSWORD` using school IT's settings. The username may need to be your full school email or `user@school-domain`, rather than a short ID. The outer identity is separate: IT may specify an anonymous identity or an empty string. Do not commit or share your edited credentials. The sketch uses **WPA2-Enterprise PEAP** on 2.4 GHz; a school using TTLS, TLS, or a browser captive portal needs different settings.
 4. Upload, open Serial Monitor at **115200 baud**, then press EN/reset if startup messages were missed.
 5. Expect `PASS: Connected to Wi-Fi and received an IP address.` followed by an `http://` address. Connection status and signal strength print every five seconds.
 6. Open that exact HTTP address on a phone or computer on the same local network. Expect `PASS: Your browser reached the ESP32 over local Wi-Fi!` and a matching Serial Monitor message. This confirms local HTTP communication, not internet access.
 7. To test reconnection, briefly disable the access point (or move the board out of range), then restore it. Expect the disconnection message, reconnection, and the current IP address. Repeat the browser test using the new address if it changed.
+
+School server verification: `EAP_CA_CERT` accepts the IT-provided root CA certificate as PEM text, for example `R"PEM(-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----)PEM"` with the actual PEM line breaks and contents. The default `nullptr` matches Espressif's certificate-free example and **does not authenticate the Wi-Fi server**; obtain school IT's certificate and settings before using real credentials. Do not substitute an arbitrary website certificate. See [Espressif's Enterprise example](https://github.com/espressif/arduino-esp32/blob/3.3.2/libraries/WiFi/examples/WiFiClientEnterprise/WiFiClientEnterprise.ino).
+
+Campus Wi-Fi may isolate devices even when both have internet access. If the board connects but its local page is unreachable, ask IT about device-to-device access or an approved project network; Serial Monitor pump commands still work.
 
 ## Turn the pump on and off
 
