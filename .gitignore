@@ -1,0 +1,2 @@
+# Local Wi-Fi credentials must never be committed to the public repository.
+**/wifi_secrets.h

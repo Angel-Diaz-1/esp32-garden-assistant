@@ -7,6 +7,8 @@
     <title>Garden Assistant</title>
     <link rel="stylesheet" href="./src/styles.css" />
     <!-- Defer waits until the HTML is ready before attaching the button listener. -->
+    <script src="./src/board-client.js" defer></script>
+    <script src="./src/board-status.js" defer></script>
     <script src="./src/app.js" defer></script>
   </head>
   <body>
@@ -15,6 +17,15 @@
       <p class="eyebrow">ESP32 GARDEN ASSISTANT</p>
       <h1 id="page-title">A little care.<br />A greener day.</h1>
       <p class="description">Your plant’s next drink is one tap away.</p>
+      <!-- Explicit connection lets the browser request local-network permission. -->
+      <form id="board-form" class="board-settings">
+        <label for="board-address">ESP32 IP address</label>
+        <input id="board-address" type="text" value="10.0.0.44" required
+          autocomplete="off" spellcheck="false" aria-describedby="board-help" />
+        <button type="submit" class="plant-type-toggle">Connect board</button>
+        <p id="board-help" class="field-help">Use the IP shown in Serial Monitor. Stay on the same Wi-Fi and allow local-network access when prompted.</p>
+      </form>
+      <p id="board-status" class="board-status" role="status" aria-live="polite" data-state="disconnected">Board not checked</p>
       <button id="plant-type-toggle" class="plant-type-toggle" type="button" aria-pressed="false" aria-label="Switch to outdoor plant">
         Plant type: Indoor
       </button>
@@ -31,7 +42,7 @@
       <!-- A native button supports mouse, touch, Enter, and Space automatically. -->
       <button id="water-button" class="water-button" type="button">water plant</button>
       <!-- Live status announces click feedback to screen readers without moving focus. -->
-      <p id="watering-status" class="status" role="status" aria-live="polite">Demo mode · ESP32 not connected</p>
+      <p id="watering-status" class="status" role="status" aria-live="polite">Watering demo · pump control not enabled</p>
     </main>
   </body>
 </html>

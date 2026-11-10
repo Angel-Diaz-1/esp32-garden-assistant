@@ -1,9 +1,8 @@
-// Keep device communication separate from the UI so the team can add it later.
-// This starter deliberately makes no network request and cannot run a water pump.
+// Board health checks run separately; the firmware does not yet expose watering.
 async function requestWatering() {
   // Future integration: send a request to the server that controls the ESP32.
   // Only report successful watering after the device confirms the command.
-  return { connected: false };
+  return { connected: boardConnected, wateringAvailable: false };
 }
 
 async function isRainingAtZipCode(zipCode) {
@@ -90,8 +89,8 @@ waterButton.addEventListener('click', async () => {
 
     const result = await requestWatering();
     const wateringMessage = result.connected
-      ? 'Watering command confirmed.'
-      : 'Button pressed! Connect the ESP32 to enable watering.';
+      ? 'Board connected. Pump control is not enabled; no watering command was sent.'
+      : 'Watering demo: board connection has not been confirmed. Click Connect board.';
     wateringStatus.textContent = [weatherCheckWarning, wateringMessage].filter(Boolean).join(' ');
   } catch (error) {
     // A failed request must never appear to the user as successful watering.

@@ -1,0 +1,20 @@
+name: Wi-Fi sketch compile check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test live board status and failure handling
+        run: node --test web-app/tests/board-status.test.cjs
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Compile connectivity sketch for NodeMCU-32S
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.2 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli compile --fqbn esp32:esp32:nodemcu-32s firmware/wifi_connectivity_test
