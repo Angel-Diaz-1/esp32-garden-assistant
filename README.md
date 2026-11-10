@@ -24,7 +24,7 @@ As those components are implemented, add `firmware/garden_controller/` for ESP32
 
 ## Connecting the ESP32 later
 
-For a standalone Wi-Fi connection test, open `firmware/wifi_connectivity_test/wifi_connectivity_test.ino` and follow the [Wi-Fi test guide](docs/wifi-connectivity-test.md). It reports connection status in Serial Monitor and provides a local HTTP endpoint for a browser test. Keep actual credentials in the ignored `wifi_secrets.h` file.
+For the combined Wi-Fi and pump sketch, open `firmware/wifi_connectivity_test/wifi_connectivity_test.ino` and follow the [wiring and upload guide](docs/wifi-connectivity-test.md). It reports Wi-Fi status and controls an Adafruit MOSFET driver on GPIO25. Open the board's own IP address for pump ON/OFF buttons, or send `1` / `0` in Serial Monitor. Each run is limited to 10 seconds. Keep actual credentials in the ignored `wifi_secrets.h` file.
 
 With the updated Wi-Fi firmware uploaded, enter the board's IP in the website and click **Connect board** for live status. Allow local-network access in a supported browser. Successful health checks show **Board connected**; watering remains a demo until a pump API is added. See the guide for permission and connectivity troubleshooting.
 

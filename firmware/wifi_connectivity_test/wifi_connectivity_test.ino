@@ -17,9 +17,63 @@ unsigned long lastRetry = 0;
 unsigned long lastStatus = 0;
 bool previouslyConnected = false;
 
+// NodeMCU-32S / classic ESP32: GPIO25 goes to the Adafruit driver's In.
+constexpr uint8_t kPumpPin = 25;
+constexpr unsigned long kMaxPumpRunMs = 10000;
+bool pumpOn = false;
+unsigned long pumpStartedAt = 0;
+
+void stopPump() {
+  digitalWrite(kPumpPin, LOW);
+  if (pumpOn) Serial.println("Pump OFF");
+  pumpOn = false;
+}
+
+void startPump() {
+  // Repeated ON commands must not extend a run indefinitely.
+  if (pumpOn) return;
+  pumpStartedAt = millis();
+  pumpOn = true;
+  digitalWrite(kPumpPin, HIGH);
+  Serial.println("Pump ON (maximum 10 seconds)");
+}
+
+void servicePump() {
+  if (pumpOn && millis() - pumpStartedAt >= kMaxPumpRunMs) {
+    stopPump();
+    Serial.println("Automatic stop: 10-second limit reached.");
+  }
+}
+
+void sendPumpPage() {
+  String page = F("<!doctype html><html lang='en'><meta charset='utf-8'>"
+    "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    "<title>Garden pump</title><body><h1>Garden pump</h1>"
+    "<p>PASS: Your browser reached the ESP32 over local Wi-Fi!</p>"
+    "<p>Commanded pump state: <strong>");
+  page += pumpOn ? "ON" : "OFF";
+  page += F("</strong></p><p>ON runs for up to 10 seconds. "
+    "Keep the pump submerged. Refresh to update the displayed state.</p>"
+    "<form method='post' action='/pump/on'><button>Turn pump ON</button></form>"
+    "<br><form method='post' action='/pump/off'><button>Turn pump OFF</button></form>"
+    "<p><a href='/'>Refresh status</a></p></body></html>");
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "text/html", page);
+}
+
+void redirectToPumpPage() {
+  server.sendHeader("Location", "/");
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(303, "text/plain", "See pump controls at /");
+}
+
 void setup() {
+  // Initialize the output before waiting for Serial or Wi-Fi.
+  pinMode(kPumpPin, OUTPUT);
+  stopPump();
   Serial.begin(115200);
   delay(1000);
+  Serial.println("Pump ready on GPIO25. Send 1 for ON, 0 for OFF.");
 
   // Station mode joins an existing network instead of creating an access point.
   WiFi.mode(WIFI_STA);
@@ -29,14 +83,16 @@ void setup() {
   Serial.println("\nConnecting to Wi-Fi...");
 
   // Read-only health endpoint for the separate GitHub Pages website.
-  // It exposes no credentials and does not operate any hardware.
+  // wateringAvailable refers to the separate GitHub Pages integration,
+  // which remains a demo. Real pump controls live on this board's own page.
   server.on("/api/status", HTTP_GET, []() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     server.sendHeader("Cache-Control", "no-store");
     server.send(200, "application/json",
       String("{\"device\":\"garden-assistant-esp32\",\"connected\":") +
       (WiFi.status() == WL_CONNECTED ? "true" : "false") +
-      ",\"wateringAvailable\":false}");
+      ",\"wateringAvailable\":false,\"pumpOn\":" +
+      (pumpOn ? "true" : "false") + "}");
   });
   // Some browsers preflight requests to private network devices.
   server.on("/api/status", HTTP_OPTIONS, []() {
@@ -47,16 +103,29 @@ void setup() {
   });
 
   server.on("/", HTTP_GET, []() {
-    server.sendHeader("Cache-Control", "no-store");
-    server.send(200, "text/plain",
-      "PASS: Your browser reached the ESP32 over local Wi-Fi!\n"
-      "Garden Assistant connectivity test.");
+    sendPumpPage();
     Serial.println("PASS: Received a browser request over Wi-Fi.");
+  });
+  // The board's forms submit POST requests. Use only on a trusted LAN.
+  server.on("/pump/on", HTTP_POST, []() {
+    startPump();
+    redirectToPumpPage();
+  });
+  server.on("/pump/off", HTTP_POST, []() {
+    stopPump();
+    redirectToPumpPage();
   });
   server.begin();
 }
 
 void loop() {
+  servicePump();
+  // Read one character per loop so input cannot delay pump timing or Wi-Fi.
+  if (Serial.available() > 0) {
+    const char command = Serial.read();
+    if (command == '0') stopPump();
+    else if (command == '1') startPump();
+  }
   const unsigned long now = millis();
   const bool connected = WiFi.status() == WL_CONNECTED;
 
@@ -67,6 +136,7 @@ void loop() {
     Serial.println(WiFi.localIP());
   }
   if (!connected && previouslyConnected) {
+    stopPump();
     Serial.println("Wi-Fi connection lost. Reconnecting...");
   }
   previouslyConnected = connected;
@@ -93,5 +163,6 @@ void loop() {
       Serial.println("Wi-Fi test: not connected yet.");
     }
   }
+  servicePump();
   delay(2);
 }
