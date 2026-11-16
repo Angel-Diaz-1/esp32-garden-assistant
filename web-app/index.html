@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Manual watering control for the ESP32 Garden Assistant." />
     <title>Garden Assistant</title>
+    <script src="./src/theme.js"></script>
     <link rel="stylesheet" href="./src/styles.css" />
     <!-- Defer waits until the HTML is ready before attaching the button listener. -->
     <script src="./src/board-client.js" defer></script>
@@ -13,6 +14,10 @@
   </head>
   <body>
     <main class="watering-card" aria-labelledby="page-title">
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">
+        <span class="theme-switch" aria-hidden="true"></span>
+        Dark mode
+      </button>
       <span class="plant-mark" aria-hidden="true">&#127793;</span>
       <p class="eyebrow">ESP32 GARDEN ASSISTANT</p>
       <h1 id="page-title">A little care.<br />A greener day.</h1>
