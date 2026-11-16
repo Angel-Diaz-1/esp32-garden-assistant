@@ -1,6 +1,8 @@
-# ESP32 Wi-Fi and pump controller
+# ESP32 Wi-Fi, pump, and temperature controller
 
 This combined Arduino sketch joins Wi-Fi, reports connection status, and controls a pump through an Adafruit STEMMA MOSFET + Diode Driver (5648). It targets the project's NodeMCU-32S / classic ESP32 and uses GPIO25. Uploading it replaces the current ESP32 program. You can still test Wi-Fi with the pump disconnected.
+
+The same sketch also reads a **DS18B20 temperature probe on GPIO27**. Follow the [temperature sensor wiring and library guide](ds18b20-temperature-sensor.md). The pump remains on GPIO25, and the Wi-Fi and pump controls below are preserved.
 
 ## Wiring
 
@@ -24,7 +26,7 @@ References: [Adafruit pinouts](https://learn.adafruit.com/adafruit-mosfet-driver
 ## Upload and connect
 
 1. Open `firmware/wifi_connectivity_test/wifi_connectivity_test.ino` in Arduino IDE. The sketch now contains its settings directly and requires no `wifi_secrets.h` or `wifi_secrets.example.h`. Copying the entire `.ino` into a new Arduino sketch also works.
-2. Use **esp32 by Espressif Systems**, version **3.3.2** (the version checked by CI), select **NodeMCU-32S**, and select the connected COM port. WiFi and WebServer are included with this core. The modern Enterprise API does not require the legacy `esp_wpa2.h` header.
+2. Use **esp32 by Espressif Systems**, version **3.3.2** (the version checked by CI), select **NodeMCU-32S**, and select the connected COM port. WiFi and WebServer are included with this core. Install **OneWire 2.3.8** and **DallasTemperature 4.0.6** through Library Manager for the DS18B20 sensor. The modern Enterprise API does not require the legacy `esp_wpa2.h` header.
 3. At the top of your **local copy**, set `WIFI_NAME` (defaults to `eduroam`), `EAP_IDENTITY`, `EAP_USERNAME`, and `EAP_PASSWORD` using school IT's settings. The username may need to be your full school email or `user@school-domain`, rather than a short ID. The outer identity is separate: IT may specify an anonymous identity or an empty string. Do not commit or share your edited credentials. The sketch uses **WPA2-Enterprise PEAP** on 2.4 GHz; a school using TTLS, TLS, or a browser captive portal needs different settings.
 4. Upload, open Serial Monitor at **115200 baud**, then press EN/reset if startup messages were missed.
 5. Expect `PASS: Connected to Wi-Fi and received an IP address.` followed by an `http://` address. Connection status and signal strength print every five seconds.
