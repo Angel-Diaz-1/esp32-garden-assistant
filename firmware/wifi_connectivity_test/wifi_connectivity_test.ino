@@ -1,5 +1,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <math.h>
 
 // School Wi-Fi (WPA2-Enterprise PEAP). Edit these in your LOCAL copy only.
 // This sketch is self-contained: no wifi_secrets header is required.
@@ -28,6 +31,82 @@ constexpr uint8_t kPumpPin = 25;
 constexpr unsigned long kMaxPumpRunMs = 10000;
 bool pumpOn = false;
 unsigned long pumpStartedAt = 0;
+
+// DS18B20 probe: red -> 3V3, black -> GND, yellow -> GPIO27.
+// Add a 4.7 kOhm resistor between yellow/DATA and 3V3. Use three-wire power.
+constexpr uint8_t kTemperaturePin = 27;
+constexpr unsigned long kTemperatureIntervalMs = 2000;
+constexpr unsigned long kTemperatureConversionMs = 750;  // 12-bit maximum.
+OneWire temperatureBus(kTemperaturePin);
+DallasTemperature temperatureSensor(&temperatureBus);
+DeviceAddress temperatureAddress;
+bool temperatureSensorFound = false;
+bool temperaturePending = false;
+bool temperatureAvailable = false;
+float temperatureC = 0.0f;
+unsigned long lastTemperatureRequest = 0;
+unsigned long temperatureConversionStartedAt = 0;
+
+void setupTemperature() {
+  // Initialization runs while the pump is still OFF, before accepting commands.
+  temperatureSensor.begin();
+  temperatureSensor.setAutoSaveScratchPad(false);
+  temperatureSensor.setWaitForConversion(false);
+  lastTemperatureRequest = millis() - kTemperatureIntervalMs;
+  Serial.println("DS18B20 ready on GPIO27; sampling every 2 seconds.");
+}
+
+void serviceTemperature() {
+  const unsigned long now = millis();
+  if (temperaturePending) {
+    // Do not delay(750): Wi-Fi and the pump timer must keep running.
+    if (now - temperatureConversionStartedAt < kTemperatureConversionMs) return;
+    temperaturePending = false;
+    const float reading = temperatureSensor.getTempC(temperatureAddress);
+    temperatureAvailable = reading != DEVICE_DISCONNECTED_C &&
+      isfinite(reading) && reading >= -55.0f && reading <= 125.0f;
+    if (temperatureAvailable) {
+      temperatureC = reading;
+      Serial.print("Temperature: ");
+      Serial.print(temperatureC, 2);
+      Serial.print(" C / ");
+      Serial.print(temperatureC * 1.8f + 32.0f, 2);
+      Serial.println(" F");
+    } else {
+      temperatureSensorFound = false;
+      Serial.println("DS18B20 reading unavailable. Check wiring and the 4.7k pull-up.");
+    }
+    return;
+  }
+
+  if (now - lastTemperatureRequest < kTemperatureIntervalMs) return;
+  lastTemperatureRequest = now;
+  if (!temperatureSensorFound) {
+    // Search again after a missing/failed probe, without begin()'s startup delays.
+    // Address-based reads also allow a probe connected after boot to recover.
+    temperatureBus.reset_search();
+    temperatureSensorFound = temperatureBus.search(temperatureAddress) &&
+      temperatureAddress[0] == 0x28 &&  // DS18B20 family.
+      OneWire::crc8(temperatureAddress, 7) == temperatureAddress[7];
+    if (temperatureSensorFound) {
+      temperatureSensorFound = temperatureSensor.setResolution(temperatureAddress, 12);
+    }
+    if (!temperatureSensorFound) {
+      temperatureAvailable = false;
+      Serial.println("DS18B20 not found. Check GPIO27, 3V3, GND, and the 4.7k pull-up.");
+      return;
+    }
+  }
+
+  if (!temperatureSensor.requestTemperaturesByAddress(temperatureAddress)) {
+    temperatureAvailable = false;
+    temperatureSensorFound = false;
+    Serial.println("DS18B20 conversion could not start; retrying next sample.");
+    return;
+  }
+  temperatureConversionStartedAt = millis();
+  temperaturePending = true;
+}
 
 void stopPump() {
   digitalWrite(kPumpPin, LOW);
@@ -58,6 +137,13 @@ void sendPumpPage() {
     "<p>PASS: Your browser reached the ESP32 over local Wi-Fi!</p>"
     "<p>Commanded pump state: <strong>");
   page += pumpOn ? "ON" : "OFF";
+  page += F("</strong></p><p>Temperature: <strong>");
+  if (temperatureAvailable) {
+    page += String(temperatureC, 2) + " &deg;C / " +
+      String(temperatureC * 1.8f + 32.0f, 2) + " &deg;F";
+  } else {
+    page += F("Unavailable / waiting for DS18B20. Check sensor wiring.");
+  }
   page += F("</strong></p><p>ON runs for up to 10 seconds. "
     "Keep the pump submerged. Refresh to update the displayed state.</p>"
     "<form method='post' action='/pump/on'><button>Turn pump ON</button></form>"
@@ -80,6 +166,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("Pump ready on GPIO25. Send 1 for ON, 0 for OFF.");
+  setupTemperature();
 
   // Station mode joins an existing network instead of creating an access point.
   WiFi.mode(WIFI_STA);
@@ -101,7 +188,9 @@ void setup() {
       String("{\"device\":\"garden-assistant-esp32\",\"connected\":") +
       (WiFi.status() == WL_CONNECTED ? "true" : "false") +
       ",\"wateringAvailable\":false,\"pumpOn\":" +
-      (pumpOn ? "true" : "false") + "}");
+      (pumpOn ? "true" : "false") + ",\"temperatureAvailable\":" +
+      (temperatureAvailable ? "true" : "false") + ",\"temperatureC\":" +
+      (temperatureAvailable ? String(temperatureC, 2) : String("null")) + "}");
   });
   // Some browsers preflight requests to private network devices.
   server.on("/api/status", HTTP_OPTIONS, []() {
@@ -128,6 +217,8 @@ void setup() {
 }
 
 void loop() {
+  servicePump();
+  serviceTemperature();
   servicePump();
   // Read one character per loop so input cannot delay pump timing or Wi-Fi.
   if (Serial.available() > 0) {

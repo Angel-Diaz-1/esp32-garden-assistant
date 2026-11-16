@@ -13,6 +13,10 @@ jobs:
       - name: Test web app behavior
         run: node --test web-app/tests/*.test.cjs
       - uses: arduino/setup-arduino-cli@v2
+      - name: Install DS18B20 libraries
+        run: |
+          arduino-cli lib update-index
+          arduino-cli lib install "OneWire@2.3.8" "DallasTemperature@4.0.6"
       - name: Compile connectivity sketch for NodeMCU-32S
         run: |
           arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
