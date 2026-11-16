@@ -6,6 +6,8 @@ ESP32 based garden assistant for an embedded systems project, starting with manu
 
 Open `web-app/index.html` in your browser. No installation or build step is required.
 
+Use the **Dark mode** toggle above the plant icon to switch between light and dark backgrounds. The page starts in light mode and remembers your choice in this browser when local storage is available.
+
 The **water plant** button currently shows demo feedback. It does not contact an ESP32 or operate a pump. Use the plant type button to switch between indoor and outdoor settings. For an outdoor plant, enabling water-saving mode checks the plant's US ZIP code against current rain from the free Open-Meteo API; if rain is detected, that watering cycle is skipped. ZIP-code lookup uses the free Zippopotam.us API. A weather lookup failure is reported and does not prevent normal watering.
 
 The GitHub Actions workflow deploys `web-app/` to GitHub Pages after changes are pushed to `main` (or when manually triggered). Once deployment succeeds, the site is available at <https://angel-diaz-1.github.io/esp32-garden-assistant/>.
@@ -18,6 +20,7 @@ web-app/
   src/
     styles.css     Responsive page styling
     app.js         Click handling and future device integration point
+    theme.js       Theme initialization and saved light/dark preference
 ```
 
 As those components are implemented, add `firmware/garden_controller/` for ESP32 code, `server/` for the device API, `hardware/` for wiring, and `docs/` for team documentation. Static assets can go in `web-app/public/` when needed.
@@ -32,4 +35,6 @@ Replace the demo implementation of `requestWatering()` in `web-app/src/app.js` w
 
 ## Manual check
 
-Open the page, press **water plant**, and confirm that it reports the ESP32 needs connecting. Switch to outdoor mode, enter a valid US ZIP code, enable water-saving mode, and confirm the page checks current rain before watering. Tab to the controls and activate them with Enter or Space. Check that the layout fits a phone screen.
+Open the page, press **water plant**, and confirm that it reports the ESP32 needs connecting. Switch to outdoor mode, enter a valid US ZIP code, enable water-saving mode, and confirm the page checks current rain before watering. Tab to the controls and activate them with Enter or Space. Check that the layout fits a phone screen. Toggle **Dark mode** with the mouse and keyboard, check that text and inputs remain readable in both themes, and reload to confirm the chosen theme is restored.
+
+Run the web app tests with Node.js: `node --test web-app/tests/*.test.cjs`.

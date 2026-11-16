@@ -10,8 +10,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Test live board status and failure handling
-        run: node --test web-app/tests/board-status.test.cjs
+      - name: Test web app behavior
+        run: node --test web-app/tests/*.test.cjs
       - uses: arduino/setup-arduino-cli@v2
       - name: Compile connectivity sketch for NodeMCU-32S
         run: |
