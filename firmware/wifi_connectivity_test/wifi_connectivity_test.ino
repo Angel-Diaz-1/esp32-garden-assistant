@@ -4,9 +4,11 @@
 #include <DallasTemperature.h>
 #include <math.h>
 #include <esp_eap_client.h>
+#include <Preferences.h>
+#include <cstring>
 
 // Enter SSID, optional school user ID, and password in Serial Monitor.
-// Credentials stay in RAM; setup is required after each reset/power cycle.
+// Save successful Wi-Fi credentials in NVS to reconnect after a power cycle.
 // Optional school-specific outer identity. nullptr uses the entered user ID.
 constexpr const char* EAP_IDENTITY_OVERRIDE = nullptr;
 
@@ -25,6 +27,73 @@ String serialLine;
 bool serialLineOverflow = false;
 bool skipSerialLf = false;
 bool skipSetupCommandNewline = false;
+bool wifiSavePending = false;
+
+// Store one versioned blob so a power loss cannot mix fields from two profiles.
+struct SavedWifiProfile {
+  uint32_t signature;
+  char name[33];
+  char userId[128];
+  char password[128];
+};
+constexpr uint32_t kWifiProfileSignature = 0x47570101;
+constexpr const char* kWifiNamespace = "garden-wifi";
+
+bool validWifiPassword(const String& password, bool enterprise) {
+  const size_t length = password.length();
+  if (enterprise) return length > 0 && length <= 127;
+  if (length == 0 || (length >= 8 && length <= 63)) return true;
+  if (length != 64) return false;
+  for (size_t i = 0; i < length; ++i) {
+    const char c = password[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+          (c >= 'A' && c <= 'F'))) return false;
+  }
+  return true;
+}
+
+bool loadWifiCredentials() {
+  Preferences storage;
+  if (!storage.begin(kWifiNamespace, true)) return false;
+  SavedWifiProfile profile = {};
+  const bool complete = storage.getBytesLength("profile") == sizeof(profile) &&
+    storage.getBytes("profile", &profile, sizeof(profile)) == sizeof(profile);
+  storage.end();
+  if (!complete || profile.signature != kWifiProfileSignature ||
+      memchr(profile.name, '\0', sizeof(profile.name)) == nullptr ||
+      memchr(profile.userId, '\0', sizeof(profile.userId)) == nullptr ||
+      memchr(profile.password, '\0', sizeof(profile.password)) == nullptr) return false;
+  const String name(profile.name);
+  const String userId(profile.userId);
+  const String password(profile.password);
+  if (name.length() == 0 || name.length() > 32 || userId.length() > 127 ||
+      !validWifiPassword(password, userId.length() > 0)) return false;
+  wifiName = name;
+  wifiUserId = userId;
+  wifiPassword = password;
+  return true;
+}
+
+bool saveWifiCredentials() {
+  Preferences storage;
+  if (!storage.begin(kWifiNamespace, false)) return false;
+  SavedWifiProfile profile = {};
+  profile.signature = kWifiProfileSignature;
+  wifiName.toCharArray(profile.name, sizeof(profile.name));
+  wifiUserId.toCharArray(profile.userId, sizeof(profile.userId));
+  wifiPassword.toCharArray(profile.password, sizeof(profile.password));
+  const bool saved = storage.putBytes("profile", &profile, sizeof(profile)) == sizeof(profile);
+  storage.end();
+  return saved;
+}
+
+bool forgetWifiCredentials() {
+  Preferences storage;
+  if (!storage.begin(kWifiNamespace, false)) return false;
+  const bool cleared = storage.clear();
+  storage.end();
+  return cleared;
+}
 
 // The local HTTP endpoint lets a second device verify communication with ESP32.
 WebServer server(80);
@@ -216,11 +285,12 @@ void beginWifiSetup() {
   wifiName = "";
   wifiUserId = "";
   wifiPassword = "";
+  wifiSavePending = false;
   serialLine = "";
   serialLineOverflow = false;
   wifiSetupStep = WifiSetupStep::Name;
   Serial.println("\nWi-Fi setup: select Newline or Both NL & CR in Serial Monitor.");
-  Serial.println("Enter each answer and press Send. Credentials are not printed or saved to flash.");
+  Serial.println("Enter each answer and press Send. Credentials are not printed; saved after a successful connection.");
   printWifiPrompt();
 }
 
@@ -239,7 +309,7 @@ void connectConfiguredWifi() {
   }
   lastRetry = millis();
   lastStatus = millis();
-  Serial.println("Send W to change Wi-Fi, 1 for pump ON, or 0 for OFF.");
+  Serial.println("Send W to change Wi-Fi, F to forget saved Wi-Fi, 1 for pump ON, or 0 for OFF.");
 }
 
 void acceptWifiAnswer() {
@@ -265,23 +335,14 @@ void acceptWifiAnswer() {
       wifiSetupStep = WifiSetupStep::Password;
     }
   } else if (wifiSetupStep == WifiSetupStep::Password) {
-    const size_t length = serialLine.length();
-    bool valid = wifiUserId.length() ? (length > 0 && length <= 127)
-      : (length == 0 || (length >= 8 && length <= 63));
-    if (wifiUserId.length() == 0 && length == 64) {
-      valid = true; // WPA personal also permits a raw 64-digit hexadecimal PSK.
-      for (size_t i = 0; i < length; ++i) {
-        const char c = serialLine[i];
-        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-              (c >= 'A' && c <= 'F'))) valid = false;
-      }
-    }
+    const bool valid = validWifiPassword(serialLine, wifiUserId.length() > 0);
     if (!valid) {
       Serial.println(wifiUserId.length() ? "School password must contain 1 to 127 bytes."
         : "Home password must contain 8 to 63 characters, 64 hex digits, or be empty for an open network.");
     } else {
       wifiPassword = serialLine; // Do not trim or echo passwords.
       wifiSetupStep = WifiSetupStep::Ready;
+      wifiSavePending = true;
       connectConfiguredWifi();
     }
   }
@@ -308,6 +369,13 @@ void serviceSerial() {
       else if (c == 'w' || c == 'W') {
         beginWifiSetup();
         skipSetupCommandNewline = true;
+      } else if (c == 'f' || c == 'F') {
+        stopPump();
+        if (forgetWifiCredentials()) {
+          Serial.println("Saved Wi-Fi credentials erased.");
+          beginWifiSetup();
+          skipSetupCommandNewline = true;
+        } else Serial.println("Could not erase saved Wi-Fi. Pump stopped; storage error.");
       }
     } else if (c == '\r' || c == '\n') acceptWifiAnswer();
     else if (c == '\b' || c == 127) {
@@ -413,7 +481,8 @@ void setup() {
   setupTemperature();
   setupMoisture();
 
-  // Keep credentials in RAM and join a network only after the setup prompts.
+  // Our Preferences profile owns persistence, including Enterprise user ID.
+  // Do not let the Wi-Fi driver persist a second, incomplete credential copy.
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
 
@@ -439,7 +508,12 @@ void setup() {
     redirectToPumpPage();
   });
   server.begin();
-  beginWifiSetup();
+  if (loadWifiCredentials()) {
+    Serial.println("Saved Wi-Fi settings found. Reconnecting automatically...");
+    wifiSetupStep = WifiSetupStep::Ready;
+    esp_wifi_sta_enterprise_disable();
+    connectConfiguredWifi();
+  } else beginWifiSetup();
 }
 
 void loop() {
@@ -456,6 +530,12 @@ void loop() {
 
   // Print the current address after each connection, including reconnections.
   if (connected && !previouslyConnected) {
+    if (wifiSavePending) {
+      // Write once after successful authentication, not on each reconnect.
+      wifiSavePending = false;
+      if (saveWifiCredentials()) Serial.println("Wi-Fi credentials saved. External power/restarts can reconnect automatically.");
+      else Serial.println("Wi-Fi connected, but saving failed. New settings were not saved; send W to retry setup.");
+    }
     Serial.println("\nPASS: Connected to Wi-Fi and received an IP address.");
     Serial.print("Open on a device on the same network: http://");
     Serial.println(WiFi.localIP());

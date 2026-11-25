@@ -37,7 +37,25 @@ School server verification: `EAP_CA_CERT` accepts the IT-provided root CA certif
 
 The outer Enterprise identity defaults to the entered user ID. If IT requires an anonymous or empty identity, set `EAP_IDENTITY_OVERRIDE` in your local sketch accordingly (an empty string is distinct from `nullptr`). A home network never uses the Enterprise identity or CA settings.
 
-Send **W** after setup to stop the pump, disconnect Wi-Fi, and restart the three prompts. Use this to fix a password or switch from school to home Wi-Fi; Enterprise authentication is explicitly disabled before the new configuration. Credentials are session-only in RAM and must be re-entered after reset or power loss. The firmware does not echo them or save them to flash, and no credentials belong in GitHub. Setup is through USB Serial, not the public website: the board must join Wi-Fi before the website can reach it. After changing networks, copy the new IP into the website.
+On the first boot, enter the three answers through USB Serial. After Wi-Fi successfully connects, wait for **Wi-Fi credentials saved**. SSID, optional user ID, and password are stored in the ESP32's Preferences/NVS flash as one versioned profile. After reset or power loss, the board loads this profile and reconnects automatically without a computer. The pump starts OFF; reconnection does not start watering.
+
+Send **W** after setup to stop the pump, disconnect Wi-Fi, and restart the three prompts. Use this to fix a password or switch from school to home Wi-Fi; Enterprise authentication is explicitly disabled before the new configuration. The previous saved profile is replaced only after the new network successfully connects, so an incorrect password does not overwrite a working profile. A reboot during unfinished setup restores the previous saved network. If the saved network is unavailable, the board keeps retrying; connect USB and send W to select another one.
+
+Send **F** outside the setup prompts to stop the pump, erase the saved Wi-Fi profile, disconnect, and return to setup. This also works while saved credentials are trying to connect. After a successful erase, restarting prompts again until new credentials are entered and successfully saved. Flash failures are reported instead of claiming a successful save/erase. No flash writes occur on ordinary reconnections or sensor/status updates.
+
+Credentials are never printed back, sent to the website, or committed to GitHub. They are stored on the board; Preferences storage is not an encryption guarantee. Use F before handing the board to someone else. The namespace is `garden-wifi`; forgetting Wi-Fi does not erase the firmware. See [Espressif's Preferences documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/preferences.html).
+
+Setup is through USB Serial, not the public website: the board must join Wi-Fi before the website can reach it. After switching networks or rebooting, its IP may change; enter the current IP into the website.
+
+## Switch to external power
+
+1. Upload this revised sketch and complete Wi-Fi setup over USB.
+2. Wait for both **Wi-Fi credentials saved** and the successful connection/IP message. If saving fails, stay connected and send W to retry setup.
+3. Switch off pump power, unplug computer USB, and power the ESP32 through its USB port with a regulated 5 V USB adapter or power bank. Do not apply 9 V directly to USB or 3V3. The pump still needs its own suitable supply, MOSFET driver, and shared ground as wired above.
+4. The board reconnects automatically to the saved network. Verify on the website; if DHCP assigns a different IP, find it in the router's client list or reconnect USB to read Serial Monitor. A router DHCP reservation can keep the address consistent.
+5. Enable pump power and test a manual run. A reset or reconnect must leave the pump OFF.
+
+Hardware verification should include a home-network power cycle, a school-network power cycle, W with incorrect credentials followed by a reboot (previous working profile restored), a successful replacement, and F followed by a power cycle (setup prompts restored). These checks require the actual board and network.
 
 Campus Wi-Fi may isolate devices even when both have internet access. If the board connects but its local page is unreachable, ask IT about device-to-device access or an approved project network; Serial Monitor pump commands still work.
 
