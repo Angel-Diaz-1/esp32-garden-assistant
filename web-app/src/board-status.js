@@ -14,6 +14,7 @@ function showBoardStatus(state, message) {
   boardStatus.dataset.state = state;
   boardStatus.textContent = message;
   if (typeof updateTemperature === 'function') updateTemperature(latestBoardStatus, boardConnected);
+  if (typeof updateMoisture === 'function') updateMoisture(latestBoardStatus, boardConnected);
   if (typeof refreshPumpControls === 'function') refreshPumpControls();
 }
 

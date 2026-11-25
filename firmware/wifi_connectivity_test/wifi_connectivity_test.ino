@@ -55,6 +55,61 @@ float temperatureC = 0.0f;
 unsigned long lastTemperatureRequest = 0;
 unsigned long temperatureConversionStartedAt = 0;
 
+// Capacitive Soil Moisture Sensor v1.2: VCC -> 3V3, GND -> GND, AOUT -> P34.
+// GPIO34 is ADC1, which remains usable with Wi-Fi. No MOSFET is needed.
+constexpr uint8_t kMoisturePin = 34;
+constexpr unsigned long kMoistureIntervalMs = 2000;
+// Replace -1 with measurements from your own dry/wet soil at 3.3 V.
+// Until calibrated, expose raw ADC data rather than inventing a percentage.
+constexpr int kMoistureDryRaw = -1;
+constexpr int kMoistureWetRaw = -1;
+bool moistureAvailable = false;
+int moistureRaw = 0;
+float moisturePercent = 0.0f;
+unsigned long lastMoistureRead = 0;
+
+bool moistureCalibrated() {
+  return kMoistureDryRaw > 0 && kMoistureDryRaw < 4095 &&
+    kMoistureWetRaw > 0 && kMoistureWetRaw < 4095 &&
+    abs(kMoistureDryRaw - kMoistureWetRaw) >= 100;
+}
+
+void setupMoisture() {
+  pinMode(kMoisturePin, INPUT);
+  analogReadResolution(12);
+  analogSetPinAttenuation(kMoisturePin, ADC_11db);
+  lastMoistureRead = millis() - kMoistureIntervalMs;
+  Serial.println("Soil moisture ready on GPIO34; power sensor from 3V3.");
+}
+
+void serviceMoisture() {
+  if (millis() - lastMoistureRead < kMoistureIntervalMs) return;
+  lastMoistureRead = millis();
+  uint32_t total = 0;
+  bool clipped = false;
+  // Eight bounded ADC conversions, with no delay/wait loop between samples.
+  for (uint8_t i = 0; i < 8; ++i) {
+    const int sample = analogRead(kMoisturePin);
+    if (sample <= 0 || sample >= 4095) clipped = true;
+    total += sample;
+  }
+  moistureRaw = (total + 4) / 8;
+  moistureAvailable = !clipped;
+  if (moistureAvailable && moistureCalibrated()) {
+    moisturePercent = 100.0f * (moistureRaw - kMoistureDryRaw) /
+      (kMoistureWetRaw - kMoistureDryRaw);
+    moisturePercent = constrain(moisturePercent, 0.0f, 100.0f);
+  }
+  Serial.print("Soil moisture raw (0-4095): ");
+  Serial.print(moistureRaw);
+  if (!moistureAvailable) Serial.println(" | ADC clipped: check wiring/power.");
+  else if (moistureCalibrated()) {
+    Serial.print(" | Relative moisture: ");
+    Serial.print(moisturePercent, 1);
+    Serial.println(" %");
+  } else Serial.println(" | Set dry/wet calibration values for a percentage.");
+}
+
 void setupTemperature() {
   // Initialization runs while the pump is still OFF, before accepting commands.
   temperatureSensor.begin();
@@ -276,6 +331,12 @@ void sendPumpPage() {
   } else {
     page += F("Unavailable / waiting for DS18B20. Check sensor wiring.");
   }
+  page += F("</strong></p><p>Soil moisture: <strong>");
+  if (moistureAvailable) {
+    page += String(moistureRaw) + " raw ADC";
+    if (moistureCalibrated()) page += " / " + String(moisturePercent, 1) + " % relative";
+    else page += " (calibration needed for %)";
+  } else page += F("Unavailable / check GPIO34 and sensor wiring.");
   page += F("</strong></p><p>ON runs for up to 10 seconds. "
     "Keep the pump submerged. Refresh to update the displayed state.</p>"
     "<form method='post' action='/pump/on'><button>Turn pump ON</button></form>"
@@ -316,7 +377,12 @@ void sendApiStatus() {
     ",\"wateringAvailable\":true,\"pumpOn\":" + (pumpOn ? "true" : "false") +
     ",\"maxRunMs\":" + String(kMaxPumpRunMs) + ",\"remainingMs\":" + String(remaining) +
     ",\"temperatureAvailable\":" + (temperatureAvailable ? "true" : "false") +
-    ",\"temperatureC\":" + (temperatureAvailable ? String(temperatureC, 2) : String("null")) + "}");
+    ",\"temperatureC\":" + (temperatureAvailable ? String(temperatureC, 2) : String("null")) +
+    ",\"moistureAvailable\":" + (moistureAvailable ? "true" : "false") +
+    ",\"moistureRaw\":" + (moistureAvailable ? String(moistureRaw) : String("null")) +
+    ",\"moistureCalibrated\":" + (moistureCalibrated() ? "true" : "false") +
+    ",\"moisturePercent\":" + (moistureAvailable && moistureCalibrated()
+      ? String(moisturePercent, 1) : String("null")) + "}");
 }
 
 void handlePumpCommand() {
@@ -345,6 +411,7 @@ void setup() {
   delay(1000);
   Serial.println("Pump ready on GPIO25. Send 1 for ON, 0 for OFF.");
   setupTemperature();
+  setupMoisture();
 
   // Keep credentials in RAM and join a network only after the setup prompts.
   WiFi.persistent(false);
@@ -378,7 +445,10 @@ void setup() {
 void loop() {
   servicePump();
   // Avoid sensor/status log noise while a user is answering setup prompts.
-  if (wifiSetupStep == WifiSetupStep::Ready) serviceTemperature();
+  if (wifiSetupStep == WifiSetupStep::Ready) {
+    serviceTemperature();
+    serviceMoisture();
+  }
   servicePump();
   serviceSerial();
   const unsigned long now = millis();

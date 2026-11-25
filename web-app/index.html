@@ -11,6 +11,7 @@
     <script src="./src/board-client.js" defer></script>
     <script src="./src/privacy.js" defer></script>
     <script src="./src/temperature.js" defer></script>
+    <script src="./src/moisture.js" defer></script>
     <script src="./src/board-status.js" defer></script>
     <script src="./src/app.js" defer></script>
   </head>
@@ -34,11 +35,18 @@
         <p id="board-help" class="field-help">Use the IP shown in Serial Monitor. Stay on the same Wi-Fi and allow local-network access when prompted.</p>
       </form>
       <p id="board-status" class="board-status" role="status" aria-live="polite" data-state="disconnected">Board not checked</p>
-      <section class="temperature-card" aria-labelledby="temperature-heading">
-        <h2 id="temperature-heading">Plant temperature</h2>
-        <p id="temperature-value" class="temperature-value" aria-live="polite">— °C <span>/ — °F</span></p>
-        <p id="temperature-status" class="field-help">Connect your board to see the probe temperature.</p>
-      </section>
+      <div class="sensor-grid">
+        <section class="temperature-card" aria-labelledby="temperature-heading">
+          <h2 id="temperature-heading">Plant temperature</h2>
+          <p id="temperature-value" class="temperature-value" aria-live="polite">— °C <span>/ — °F</span></p>
+          <p id="temperature-status" class="field-help">Connect your board to see the probe temperature.</p>
+        </section>
+        <section class="temperature-card" aria-labelledby="moisture-heading">
+          <h2 id="moisture-heading">Soil moisture</h2>
+          <p id="moisture-value" class="temperature-value" aria-live="polite">—</p>
+          <p id="moisture-status" class="field-help">Connect your board to see the moisture reading.</p>
+        </section>
+      </div>
       <button id="plant-type-toggle" class="plant-type-toggle" type="button" aria-pressed="false" aria-label="Switch to outdoor plant">
         Plant type: Indoor
       </button>
