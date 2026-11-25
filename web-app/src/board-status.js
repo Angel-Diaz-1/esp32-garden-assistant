@@ -13,6 +13,7 @@ function showBoardStatus(state, message) {
   boardConnected = state === 'connected';
   boardStatus.dataset.state = state;
   boardStatus.textContent = message;
+  if (typeof updateTemperature === 'function') updateTemperature(latestBoardStatus, boardConnected);
   if (typeof refreshPumpControls === 'function') refreshPumpControls();
 }
 
@@ -55,7 +56,7 @@ boardForm.addEventListener('submit', event => {
       }
     }
     // Schedule after completion so requests cannot overlap within this session.
-    if (generation === boardGeneration) boardPoll = setTimeout(poll, 5000);
+    if (generation === boardGeneration) boardPoll = setTimeout(poll, 2000);
   }
   poll();
 });

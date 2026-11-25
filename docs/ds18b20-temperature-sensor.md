@@ -57,7 +57,7 @@ Example extra status fields after a valid reading:
 {"temperatureAvailable": true, "temperatureC": 23.75}
 ```
 
-The separate GitHub Pages website is unchanged and does not yet display these extra fields. Use the board's own page or Serial Monitor to view the temperature.
+The GitHub Pages website displays these fields in its **Plant temperature** card, in Celsius and Fahrenheit. Connect the board by IP; the website refreshes every two seconds. Missing/disconnected sensors, network failures, and stale responses show an unavailable state instead of an old live reading. The board's own page and Serial Monitor also display temperature. Position the probe at the plant/soil location you intend to measure.
 
 ## Check on the physical board
 
