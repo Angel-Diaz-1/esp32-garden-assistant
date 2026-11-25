@@ -49,6 +49,13 @@
 .board-status { font-size: 14px; line-height: 1.5; min-height: 42px; }
 .board-status[data-state="connected"] { color: var(--connected); font-weight: 700; }
 .board-status[data-state="disconnected"] { color: var(--disconnected); }
+.privacy-toggle { width: auto; min-height: 36px; margin: 0 0 10px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--secondary); color: var(--text); font-size: 14px; box-shadow: none; }
+.privacy-toggle:hover { background: var(--secondary-hover); }
+.temperature-card { max-width: 300px; margin: 0 auto 24px; padding: 18px 14px; background: var(--input-background); border: 1px solid var(--border); border-radius: 14px; }
+.temperature-card h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+.temperature-value { margin: 0 0 10px; font-size: clamp(18px, 5vw, 24px); font-weight: 600; font-variant-numeric: tabular-nums; }
+.temperature-card .field-help { margin-bottom: 0; font-size: 14px; }
+.temperature-value[data-state="unavailable"] { color: var(--muted); }
 [hidden] { display: none; }
 
 /* Center the control while allowing the page to scroll on smaller screens. */

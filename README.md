@@ -8,6 +8,8 @@ Use the published GitHub Pages website, or run `python -m http.server 8000 --dir
 
 Use the **Dark mode** toggle above the plant icon to switch between light and dark backgrounds. The page starts in light mode and remembers your choice in this browser when local storage is available.
 
+Use **Hide IP address** to mask the address field for screen sharing; **Show IP address** reveals it again without disconnecting the board. Pump confirmations never print the IP. This is visual privacy, not encryption or access control. **Plant temperature** displays the DS18B20 probe reading in Celsius and Fahrenheit, refreshed from the board every two seconds. Missing/disconnected sensors and stale responses show an unavailable state rather than an old live reading.
+
 Upload the updated firmware, enter its current IP, and click **Connect board**. **Water for 10 seconds** sends a real ON command; **Stop pump** sends OFF without a weather check. Status confirms the board's commanded output, not measured water flow. A lost reply leaves the pump state uncertain and is never automatically retried. Use the plant type button to switch between indoor and outdoor settings. For an outdoor plant, water-saving mode checks the plant's US ZIP code against current rain from Open-Meteo and skips START when rain is detected. ZIP-code lookup uses Zippopotam.us. A weather lookup failure is reported and watering continues without the rain check.
 
 The GitHub Actions workflow deploys `web-app/` to GitHub Pages after changes are pushed to `main` (or when manually triggered). Once deployment succeeds, the site is available at <https://angel-diaz-1.github.io/esp32-garden-assistant/>.

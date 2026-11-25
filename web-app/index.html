@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="./src/styles.css" />
     <!-- Defer waits until the HTML is ready before attaching the button listener. -->
     <script src="./src/board-client.js" defer></script>
+    <script src="./src/privacy.js" defer></script>
+    <script src="./src/temperature.js" defer></script>
     <script src="./src/board-status.js" defer></script>
     <script src="./src/app.js" defer></script>
   </head>
@@ -25,12 +27,18 @@
       <!-- Explicit connection lets the browser request local-network permission. -->
       <form id="board-form" class="board-settings">
         <label for="board-address">ESP32 IP address</label>
+        <button id="privacy-toggle" class="privacy-toggle" type="button" aria-pressed="false" aria-controls="board-address">Hide IP address</button>
         <input id="board-address" type="text" value="10.0.0.44" required
           autocomplete="off" spellcheck="false" aria-describedby="board-help" />
         <button type="submit" class="plant-type-toggle">Connect board</button>
         <p id="board-help" class="field-help">Use the IP shown in Serial Monitor. Stay on the same Wi-Fi and allow local-network access when prompted.</p>
       </form>
       <p id="board-status" class="board-status" role="status" aria-live="polite" data-state="disconnected">Board not checked</p>
+      <section class="temperature-card" aria-labelledby="temperature-heading">
+        <h2 id="temperature-heading">Plant temperature</h2>
+        <p id="temperature-value" class="temperature-value" aria-live="polite">— °C <span>/ — °F</span></p>
+        <p id="temperature-status" class="field-help">Connect your board to see the probe temperature.</p>
+      </section>
       <button id="plant-type-toggle" class="plant-type-toggle" type="button" aria-pressed="false" aria-label="Switch to outdoor plant">
         Plant type: Indoor
       </button>

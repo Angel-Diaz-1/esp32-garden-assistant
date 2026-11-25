@@ -80,9 +80,11 @@ test('START waits for acknowledgement, disables duplicates, and STOP acknowledge
   assert.equal(calls.length, 1);
   finish(state(true)); await start;
   assert.match(view.elements['watering-status'].textContent, /acknowledged pump ON/);
+  assert.doesNotMatch(view.elements['watering-status'].textContent, /10\.0\.0\.44/);
   assert.equal(view.elements['water-button'].disabled, true);
   await view.click('stop-button');
   assert.match(view.elements['watering-status'].textContent, /acknowledged pump OFF/);
+  assert.doesNotMatch(view.elements['watering-status'].textContent, /10\.0\.0\.44/);
   assert.equal(view.elements['water-button'].disabled, false);
   assert.deepEqual(calls, [['10.0.0.44', 'on'], ['10.0.0.44', 'off']]);
 });
