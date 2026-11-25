@@ -117,6 +117,10 @@ button:disabled { opacity: .65; cursor: wait; }
 .saving-option input { width: 18px; height: 18px; accent-color: var(--primary); }
 .saving-option + .field-help { margin-bottom: 0; }
 .water-button { min-height: 60px; }
+.stop-button { margin-top: 12px; min-height: 48px; background: var(--secondary); color: var(--text); box-shadow: none; }
+.stop-button:hover { background: var(--secondary-hover); }
+.stop-button:disabled, .water-button:disabled { opacity: 0.55; cursor: not-allowed; }
+#pump-state { margin-top: 14px; font-size: 14px; }
 /* Reserve feedback space so a click does not shift the button. */
 .status { min-height: 44px; margin: 22px auto 0; max-width: 320px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 

@@ -1,10 +1,3 @@
-// Board health checks run separately; the firmware does not yet expose watering.
-async function requestWatering() {
-  // Future integration: send a request to the server that controls the ESP32.
-  // Only report successful watering after the device confirms the command.
-  return { connected: boardConnected, wateringAvailable: false };
-}
-
 async function isRainingAtZipCode(zipCode) {
   const zipResponse = await fetch(`https://api.zippopotam.us/us/${encodeURIComponent(zipCode)}`);
   if (!zipResponse.ok) {
@@ -46,7 +39,61 @@ const zipCodeInput = document.querySelector('#zip-code');
 const waterSavingToggle = document.querySelector('#water-saving-toggle');
 const waterButton = document.querySelector('#water-button');
 const wateringStatus = document.querySelector('#watering-status');
+const stopButton = document.querySelector('#stop-button');
+const pumpState = document.querySelector('#pump-state');
 let isOutdoorPlant = false;
+let startingPump = false;
+let stoppingPump = false;
+let actionGeneration = 0;
+let lastCommandAddress = null;
+let pendingOnCommand = null;
+
+function refreshPumpControls() {
+  waterButton.disabled = startingPump || stoppingPump || !boardConnected ||
+    !latestBoardStatus?.wateringAvailable || latestBoardStatus.pumpOn;
+  // Keep STOP available for the last commanded board even if contact is lost
+  // or the IP field is edited. Never silently send OFF to a different device.
+  stopButton.disabled = stoppingPump || !(lastCommandAddress || boardTarget);
+  if (!boardConnected || !latestBoardStatus) {
+    pumpState.textContent = 'Pump state unknown · check the board connection';
+  } else if (!latestBoardStatus.wateringAvailable) {
+    pumpState.textContent = 'Upload the updated sketch to enable pump control';
+  } else {
+    pumpState.textContent = latestBoardStatus.pumpOn
+      ? `Pump commanded ON · up to ${Math.ceil(latestBoardStatus.remainingMs / 1000)} seconds remaining`
+      : 'Pump commanded OFF';
+  }
+}
+refreshPumpControls();
+
+stopButton.addEventListener('click', async () => {
+  const address = lastCommandAddress || boardTarget;
+  if (!address || stoppingPump) return;
+  ++actionGeneration; // Cancels any START still waiting on a weather lookup.
+  stoppingPump = true;
+  boardStatusRevision++;
+  refreshPumpControls();
+  wateringStatus.textContent = 'Sending stop command…';
+  try {
+    // Do not let a later ON response overtake OFF on the single-client ESP32.
+    if (pendingOnCommand) await pendingOnCommand.catch(() => {});
+    const data = await GardenBoard.command(address, 'off');
+    boardStatusRevision++;
+    if (boardTarget === address) {
+      latestBoardStatus = data;
+      showBoardStatus('connected', 'Board connected · pump OFF');
+    }
+    lastCommandAddress = null;
+    wateringStatus.textContent = `ESP32 at ${address} acknowledged pump OFF.`;
+  } catch (error) {
+    if (boardTarget === address) showBoardStatus('disconnected', 'Board unreachable · pump state unknown');
+    boardStatusRevision++;
+    wateringStatus.textContent = 'Stop not confirmed. Switch off the pump power supply if needed. The board has a 10-second automatic limit.';
+  } finally {
+    stoppingPump = false;
+    refreshPumpControls();
+  }
+});
 
 plantTypeToggle.addEventListener('click', () => {
   isOutdoorPlant = !isOutdoorPlant;
@@ -63,9 +110,14 @@ waterSavingToggle.addEventListener('change', () => {
 });
 
 waterButton.addEventListener('click', async () => {
-  // Prevent repeated requests while a future device command is in progress.
-  waterButton.disabled = true;
-  wateringStatus.textContent = 'Checking watering connection…';
+  if (startingPump || stoppingPump || !boardConnected || !latestBoardStatus?.wateringAvailable) return;
+  const address = boardTarget;
+  const generation = ++actionGeneration;
+  const connectionGeneration = boardGeneration;
+  startingPump = true;
+  boardStatusRevision++;
+  refreshPumpControls();
+  wateringStatus.textContent = 'Preparing watering command…';
   let weatherCheckWarning = '';
 
   try {
@@ -77,7 +129,9 @@ waterButton.addEventListener('click', async () => {
       }
 
       try {
-        if (await isRainingAtZipCode(zipCodeInput.value.trim())) {
+        const raining = await isRainingAtZipCode(zipCodeInput.value.trim());
+        if (generation !== actionGeneration) return;
+        if (raining) {
           wateringStatus.textContent = 'Rain detected near your plant. Reservoir watering skipped to save water.';
           return;
         }
@@ -87,17 +141,33 @@ waterButton.addEventListener('click', async () => {
       }
     }
 
-    const result = await requestWatering();
-    const wateringMessage = result.connected
-      ? 'Board connected. Pump control is not enabled; no watering command was sent.'
-      : 'Watering demo: board connection has not been confirmed. Click Connect board.';
-    wateringStatus.textContent = [weatherCheckWarning, wateringMessage].filter(Boolean).join(' ');
+    if (generation !== actionGeneration) return;
+    if (connectionGeneration !== boardGeneration || address !== boardTarget || !boardConnected) {
+      wateringStatus.textContent = 'Board connection changed. Connect the board again before watering.';
+      return;
+    }
+    lastCommandAddress = address;
+    pendingOnCommand = GardenBoard.command(address, 'on');
+    const result = await pendingOnCommand;
+    boardStatusRevision++;
+    if (generation !== actionGeneration) return;
+    if (connectionGeneration === boardGeneration) {
+      latestBoardStatus = result;
+      showBoardStatus('connected', 'Board connected · pump ON');
+    }
+    wateringStatus.textContent = [weatherCheckWarning,
+      `ESP32 at ${address} acknowledged pump ON. It stops automatically within 10 seconds; use Stop pump to finish sooner.`
+    ].filter(Boolean).join(' ');
   } catch (error) {
-    // A failed request must never appear to the user as successful watering.
-    wateringStatus.textContent = 'Could not reach the watering controller. Please try again.';
+    if (generation !== actionGeneration) return;
+    boardStatusRevision++;
+    if (boardTarget === address) showBoardStatus('disconnected', 'Board unreachable · pump state unknown');
+    // A lost response may follow a successful start: do not claim OFF or retry.
+    wateringStatus.textContent = 'Start not confirmed; the pump may be running. Use Stop pump or switch off its supply. No automatic retry was sent.';
     console.error('Watering request failed:', error);
   } finally {
-    // Restore the control after either success or failure.
-    waterButton.disabled = false;
+    pendingOnCommand = null;
+    startingPump = false;
+    refreshPumpControls();
   }
 });
