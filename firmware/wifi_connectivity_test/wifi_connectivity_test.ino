@@ -28,7 +28,7 @@ bool previouslyConnected = false;
 
 // NodeMCU-32S / classic ESP32: GPIO25 goes to the Adafruit driver's In.
 constexpr uint8_t kPumpPin = 25;
-constexpr unsigned long kMaxPumpRunMs = 10000;
+constexpr unsigned long kMaxPumpRunMs = 30000;
 bool pumpOn = false;
 unsigned long pumpStartedAt = 0;
 
@@ -120,13 +120,13 @@ void startPump() {
   pumpStartedAt = millis();
   pumpOn = true;
   digitalWrite(kPumpPin, HIGH);
-  Serial.println("Pump ON (maximum 10 seconds)");
+  Serial.println("Pump ON (maximum 30 seconds)");
 }
 
 void servicePump() {
   if (pumpOn && millis() - pumpStartedAt >= kMaxPumpRunMs) {
     stopPump();
-    Serial.println("Automatic stop: 10-second limit reached.");
+    Serial.println("Automatic stop: 30-second limit reached.");
   }
 }
 
@@ -144,7 +144,7 @@ void sendPumpPage() {
   } else {
     page += F("Unavailable / waiting for DS18B20. Check sensor wiring.");
   }
-  page += F("</strong></p><p>ON runs for up to 10 seconds. "
+  page += F("</strong></p><p>ON runs for up to 30 seconds. "
     "Keep the pump submerged. Refresh to update the displayed state.</p>"
     "<form method='post' action='/pump/on'><button>Turn pump ON</button></form>"
     "<br><form method='post' action='/pump/off'><button>Turn pump OFF</button></form>"
@@ -157,6 +157,52 @@ void redirectToPumpPage() {
   server.sendHeader("Location", "/");
   server.sendHeader("Cache-Control", "no-store");
   server.send(303, "text/plain", "See pump controls at /");
+}
+
+void sendApiHeaders() {
+  // Allow the project's published page and local HTTP previews only.
+  const String origin = server.header("Origin");
+  if (origin == "https://angel-diaz-1.github.io" || origin.startsWith("http://localhost:") ||
+      origin.startsWith("http://127.0.0.1:")) {
+    server.sendHeader("Access-Control-Allow-Origin", origin);
+  }
+  server.sendHeader("Vary", "Origin");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+  server.sendHeader("Access-Control-Allow-Private-Network", "true");
+  server.sendHeader("Cache-Control", "no-store");
+}
+
+void sendApiStatus() {
+  servicePump();
+  sendApiHeaders();
+  const unsigned long elapsed = millis() - pumpStartedAt;
+  const unsigned long remaining = pumpOn && elapsed < kMaxPumpRunMs ? kMaxPumpRunMs - elapsed : 0;
+  server.send(200, "application/json",
+    String("{\"device\":\"garden-assistant-esp32\",\"connected\":") +
+    (WiFi.status() == WL_CONNECTED ? "true" : "false") +
+    ",\"wateringAvailable\":true,\"pumpOn\":" + (pumpOn ? "true" : "false") +
+    ",\"maxRunMs\":" + String(kMaxPumpRunMs) + ",\"remainingMs\":" + String(remaining) +
+    ",\"temperatureAvailable\":" + (temperatureAvailable ? "true" : "false") +
+    ",\"temperatureC\":" + (temperatureAvailable ? String(temperatureC, 2) : String("null")) + "}");
+}
+
+void handlePumpCommand() {
+  // JSON triggers a browser preflight; plain cross-site form posts cannot start it.
+  if (server.header("Content-Type") != "application/json") {
+    sendApiHeaders();
+    server.send(415, "application/json", "{\"error\":\"Use application/json\"}");
+    return;
+  }
+  const String body = server.arg("plain");
+  if (body == "{\"action\":\"on\"}") startPump();
+  else if (body == "{\"action\":\"off\"}") stopPump();
+  else {
+    sendApiHeaders();
+    server.send(400, "application/json", "{\"error\":\"Unknown pump action\"}");
+    return;
+  }
+  sendApiStatus();
 }
 
 void setup() {
@@ -178,27 +224,13 @@ void setup() {
   lastRetry = millis();
   Serial.println("\nConnecting to Wi-Fi...");
 
-  // Read-only health endpoint for the separate GitHub Pages website.
-  // wateringAvailable refers to the separate GitHub Pages integration,
-  // which remains a demo. Real pump controls live on this board's own page.
-  server.on("/api/status", HTTP_GET, []() {
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.sendHeader("Cache-Control", "no-store");
-    server.send(200, "application/json",
-      String("{\"device\":\"garden-assistant-esp32\",\"connected\":") +
-      (WiFi.status() == WL_CONNECTED ? "true" : "false") +
-      ",\"wateringAvailable\":false,\"pumpOn\":" +
-      (pumpOn ? "true" : "false") + ",\"temperatureAvailable\":" +
-      (temperatureAvailable ? "true" : "false") + ",\"temperatureC\":" +
-      (temperatureAvailable ? String(temperatureC, 2) : String("null")) + "}");
-  });
-  // Some browsers preflight requests to private network devices.
-  server.on("/api/status", HTTP_OPTIONS, []() {
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-    server.sendHeader("Access-Control-Allow-Private-Network", "true");
-    server.send(204);
-  });
+  const char* apiHeaders[] = {"Origin", "Content-Type"};
+  server.collectHeaders(apiHeaders, 2);
+  server.on("/api/status", HTTP_GET, sendApiStatus);
+  server.on("/api/pump", HTTP_POST, handlePumpCommand);
+  for (const char* path : {"/api/status", "/api/pump"}) {
+    server.on(path, HTTP_OPTIONS, []() { sendApiHeaders(); server.send(204); });
+  }
 
   server.on("/", HTTP_GET, []() {
     sendPumpPage();
