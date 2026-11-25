@@ -3,20 +3,28 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <math.h>
+#include <esp_eap_client.h>
 
-// School Wi-Fi (WPA2-Enterprise PEAP). Edit these in your LOCAL copy only.
-// This sketch is self-contained: no wifi_secrets header is required.
-// Keep real school credentials out of commits, screenshots, and shared files.
-constexpr const char* WIFI_NAME = "eduroam";
-constexpr const char* EAP_IDENTITY = "USER_ID";  // Outer identity: follow school IT instructions.
-constexpr const char* EAP_USERNAME = "USER_ID";  // Often the full school email/user ID.
-constexpr const char* EAP_PASSWORD = "USER_PASSWORD";
+// Enter SSID, optional school user ID, and password in Serial Monitor.
+// Credentials stay in RAM; setup is required after each reset/power cycle.
+// Optional school-specific outer identity. nullptr uses the entered user ID.
+constexpr const char* EAP_IDENTITY_OVERRIDE = nullptr;
 
 // Set to the school's IT-provided root CA PEM text to validate its server.
 // nullptr is the certificate-free example; it does NOT verify the server.
 // Obtain the correct certificate and EAP settings from school IT before
 // using real credentials. A PEM can be pasted here as R"PEM(...)PEM".
 constexpr const char* EAP_CA_CERT = nullptr;
+
+enum class WifiSetupStep { Name, UserId, Password, Ready };
+WifiSetupStep wifiSetupStep = WifiSetupStep::Name;
+String wifiName;
+String wifiUserId;
+String wifiPassword;
+String serialLine;
+bool serialLineOverflow = false;
+bool skipSerialLf = false;
+bool skipSetupCommandNewline = false;
 
 // The local HTTP endpoint lets a second device verify communication with ESP32.
 WebServer server(80);
@@ -28,7 +36,7 @@ bool previouslyConnected = false;
 
 // NodeMCU-32S / classic ESP32: GPIO25 goes to the Adafruit driver's In.
 constexpr uint8_t kPumpPin = 25;
-constexpr unsigned long kMaxPumpRunMs = 30000;
+constexpr unsigned long kMaxPumpRunMs = 10000;
 bool pumpOn = false;
 unsigned long pumpStartedAt = 0;
 
@@ -115,18 +123,142 @@ void stopPump() {
 }
 
 void startPump() {
+  if (wifiSetupStep != WifiSetupStep::Ready) {
+    Serial.println("Finish Wi-Fi setup before starting the pump.");
+    return;
+  }
   // Repeated ON commands must not extend a run indefinitely.
   if (pumpOn) return;
   pumpStartedAt = millis();
   pumpOn = true;
   digitalWrite(kPumpPin, HIGH);
-  Serial.println("Pump ON (maximum 30 seconds)");
+  Serial.println("Pump ON (maximum 10 seconds)");
 }
 
 void servicePump() {
   if (pumpOn && millis() - pumpStartedAt >= kMaxPumpRunMs) {
     stopPump();
-    Serial.println("Automatic stop: 30-second limit reached.");
+    Serial.println("Automatic stop: 10-second limit reached.");
+  }
+}
+
+void printWifiPrompt() {
+  if (wifiSetupStep == WifiSetupStep::Name) Serial.println("Wi-Fi name (SSID):");
+  else if (wifiSetupStep == WifiSetupStep::UserId) {
+    Serial.println("User ID (school Wi-Fi), or send an EMPTY line for home Wi-Fi:");
+  } else if (wifiSetupStep == WifiSetupStep::Password) {
+    Serial.println("Wi-Fi password (not echoed; empty only for an open home network):");
+  }
+}
+
+void beginWifiSetup() {
+  stopPump();
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect(false, true);
+  // Clear Enterprise mode before switching to a home network or new school ID.
+  esp_wifi_sta_enterprise_disable();
+  previouslyConnected = false;
+  wifiName = "";
+  wifiUserId = "";
+  wifiPassword = "";
+  serialLine = "";
+  serialLineOverflow = false;
+  wifiSetupStep = WifiSetupStep::Name;
+  Serial.println("\nWi-Fi setup: select Newline or Both NL & CR in Serial Monitor.");
+  Serial.println("Enter each answer and press Send. Credentials are not printed or saved to flash.");
+  printWifiPrompt();
+}
+
+void connectConfiguredWifi() {
+  WiFi.setAutoReconnect(true);
+  if (wifiUserId.length() == 0) {
+    // Blank user ID selects a normal personal/home network, not Enterprise.
+    WiFi.begin(wifiName.c_str(), wifiPassword.length() ? wifiPassword.c_str() : nullptr);
+    Serial.println("Connecting to personal/home Wi-Fi...");
+  } else {
+    const char* identity = EAP_IDENTITY_OVERRIDE == nullptr
+      ? wifiUserId.c_str() : EAP_IDENTITY_OVERRIDE;
+    WiFi.begin(wifiName.c_str(), WPA2_AUTH_PEAP, identity,
+               wifiUserId.c_str(), wifiPassword.c_str(), EAP_CA_CERT);
+    Serial.println("Connecting to school Wi-Fi (PEAP)...");
+  }
+  lastRetry = millis();
+  lastStatus = millis();
+  Serial.println("Send W to change Wi-Fi, 1 for pump ON, or 0 for OFF.");
+}
+
+void acceptWifiAnswer() {
+  if (serialLineOverflow) {
+    Serial.println("Answer too long; please enter it again.");
+    serialLine = "";
+    serialLineOverflow = false;
+    printWifiPrompt();
+    return;
+  }
+  if (wifiSetupStep == WifiSetupStep::Name) {
+    if (serialLine.length() == 0 || serialLine.length() > 32) {
+      Serial.println("SSID must contain 1 to 32 bytes.");
+    } else {
+      wifiName = serialLine; // Preserve spaces in network names.
+      wifiSetupStep = WifiSetupStep::UserId;
+    }
+  } else if (wifiSetupStep == WifiSetupStep::UserId) {
+    serialLine.trim();
+    if (serialLine.length() > 127) Serial.println("User ID must be at most 127 bytes.");
+    else {
+      wifiUserId = serialLine;
+      wifiSetupStep = WifiSetupStep::Password;
+    }
+  } else if (wifiSetupStep == WifiSetupStep::Password) {
+    const size_t length = serialLine.length();
+    bool valid = wifiUserId.length() ? (length > 0 && length <= 127)
+      : (length == 0 || (length >= 8 && length <= 63));
+    if (wifiUserId.length() == 0 && length == 64) {
+      valid = true; // WPA personal also permits a raw 64-digit hexadecimal PSK.
+      for (size_t i = 0; i < length; ++i) {
+        const char c = serialLine[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+              (c >= 'A' && c <= 'F'))) valid = false;
+      }
+    }
+    if (!valid) {
+      Serial.println(wifiUserId.length() ? "School password must contain 1 to 127 bytes."
+        : "Home password must contain 8 to 63 characters, 64 hex digits, or be empty for an open network.");
+    } else {
+      wifiPassword = serialLine; // Do not trim or echo passwords.
+      wifiSetupStep = WifiSetupStep::Ready;
+      connectConfiguredWifi();
+    }
+  }
+  serialLine = "";
+  printWifiPrompt();
+}
+
+void serviceSerial() {
+  // Bound work per loop; entering credentials must never block pump timing.
+  for (uint8_t count = 0; count < 64 && Serial.available() > 0; ++count) {
+    const char c = Serial.read();
+    if (skipSerialLf) {
+      skipSerialLf = false;
+      if (c == '\n') continue; // Treat CRLF as one submitted answer.
+    }
+    if (c == '\r') skipSerialLf = true;
+    if (skipSetupCommandNewline) {
+      skipSetupCommandNewline = false;
+      if (c == '\r' || c == '\n') continue; // The newline after W isn't an SSID.
+    }
+    if (wifiSetupStep == WifiSetupStep::Ready) {
+      if (c == '0') stopPump();
+      else if (c == '1') startPump();
+      else if (c == 'w' || c == 'W') {
+        beginWifiSetup();
+        skipSetupCommandNewline = true;
+      }
+    } else if (c == '\r' || c == '\n') acceptWifiAnswer();
+    else if (c == '\b' || c == 127) {
+      if (serialLine.length()) serialLine.remove(serialLine.length() - 1);
+    } else if (serialLine.length() < 127) serialLine += c;
+    else serialLineOverflow = true;
   }
 }
 
@@ -144,7 +276,7 @@ void sendPumpPage() {
   } else {
     page += F("Unavailable / waiting for DS18B20. Check sensor wiring.");
   }
-  page += F("</strong></p><p>ON runs for up to 30 seconds. "
+  page += F("</strong></p><p>ON runs for up to 10 seconds. "
     "Keep the pump submerged. Refresh to update the displayed state.</p>"
     "<form method='post' action='/pump/on'><button>Turn pump ON</button></form>"
     "<br><form method='post' action='/pump/off'><button>Turn pump OFF</button></form>"
@@ -214,15 +346,9 @@ void setup() {
   Serial.println("Pump ready on GPIO25. Send 1 for ON, 0 for OFF.");
   setupTemperature();
 
-  // Station mode joins an existing network instead of creating an access point.
+  // Keep credentials in RAM and join a network only after the setup prompts.
+  WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  // Arduino-ESP32 3.x configures Enterprise auth through WiFi.begin().
-  // No legacy esp_wpa2.h include is needed.
-  WiFi.begin(WIFI_NAME, WPA2_AUTH_PEAP, EAP_IDENTITY, EAP_USERNAME,
-             EAP_PASSWORD, EAP_CA_CERT);
-  lastRetry = millis();
-  Serial.println("\nConnecting to Wi-Fi...");
 
   const char* apiHeaders[] = {"Origin", "Content-Type"};
   server.collectHeaders(apiHeaders, 2);
@@ -246,18 +372,15 @@ void setup() {
     redirectToPumpPage();
   });
   server.begin();
+  beginWifiSetup();
 }
 
 void loop() {
   servicePump();
-  serviceTemperature();
+  // Avoid sensor/status log noise while a user is answering setup prompts.
+  if (wifiSetupStep == WifiSetupStep::Ready) serviceTemperature();
   servicePump();
-  // Read one character per loop so input cannot delay pump timing or Wi-Fi.
-  if (Serial.available() > 0) {
-    const char command = Serial.read();
-    if (command == '0') stopPump();
-    else if (command == '1') startPump();
-  }
+  serviceSerial();
   const unsigned long now = millis();
   const bool connected = WiFi.status() == WL_CONNECTED;
 
@@ -275,15 +398,15 @@ void loop() {
 
   if (connected) {
     server.handleClient();
-  } else if (now - lastRetry >= kRetryIntervalMs) {
+  } else if (wifiSetupStep == WifiSetupStep::Ready && now - lastRetry >= kRetryIntervalMs) {
     // Retry without holding setup() in an endless connection loop.
-    Serial.println("Still disconnected. Check credentials; retrying...");
+    Serial.println("Still disconnected. Send W to correct Wi-Fi settings; retrying...");
     WiFi.reconnect();
     lastRetry = now;
   }
 
   // Unsigned elapsed-time comparisons also work across millis() rollover.
-  if (now - lastStatus >= kStatusIntervalMs) {
+  if (wifiSetupStep == WifiSetupStep::Ready && now - lastStatus >= kStatusIntervalMs) {
     lastStatus = now;
     if (connected) {
       Serial.print("Wi-Fi connected | IP: ");

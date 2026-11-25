@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const { check, command } = require('../src/board-client.js');
 const state = (on = false) => ({ device: 'garden-assistant-esp32', connected: true,
-  wateringAvailable: true, pumpOn: on, maxRunMs: 30000, remainingMs: on ? 30000 : 0 });
+  wateringAvailable: true, pumpOn: on, maxRunMs: 10000, remainingMs: on ? 10000 : 0 });
 const reply = data => ({ ok: true, json: async () => data });
 
 test('pump commands POST JSON and require the correct device acknowledgement', async () => {
@@ -19,7 +19,7 @@ test('pump commands POST JSON and require the correct device acknowledgement', a
     });
   }
   for (const data of [{}, state(false), { ...state(true), device: 'wrong' },
-    { ...state(true), wateringAvailable: false }, { ...state(true), maxRunMs: 10000 }]) {
+    { ...state(true), wateringAvailable: false }, { ...state(true), maxRunMs: 30000 }]) {
     await assert.rejects(command('10.0.0.44', 'on', async () => reply(data)));
   }
   await assert.rejects(command('10.0.0.44', 'invalid'));
@@ -29,7 +29,7 @@ test('old firmware is recognized but malformed pump status is rejected', async (
   const old = { device: state().device, connected: true, wateringAvailable: false };
   assert.deepEqual(await check('10.0.0.44', async () => reply(old)), old);
   for (const data of [{ ...state(), pumpOn: 'false' }, { ...state(), remainingMs: -1 },
-    { ...state(), remainingMs: 31000 }]) {
+    { ...state(), remainingMs: 11000 }]) {
     await assert.rejects(check('10.0.0.44', async () => reply(data)));
   }
 });

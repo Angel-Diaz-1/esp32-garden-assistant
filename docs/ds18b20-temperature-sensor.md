@@ -49,7 +49,7 @@ arduino-cli compile --fqbn esp32:esp32:nodemcu-32s firmware/wifi_connectivity_te
 - Displays the latest valid reading on the ESP32's own pump-control page at `http://<board-ip>/`. Refresh the page to update it.
 - Adds `temperatureAvailable` and `temperatureC` to `/api/status`, preserving all existing status fields and CORS behavior. Before the first valid reading, or after a failed/disconnected sensor read, availability is false and the value is JSON `null`, not a fake temperature. A previously cached reading can remain visible until the next measurement detects the fault.
 - Retries a missing sensor automatically. A probe attached after boot can recover on a later measurement without restarting the board.
-- Preserves Enterprise Wi-Fi, reconnection, HTTP and Serial pump commands, the 30-second run limit, and stop-on-Wi-Fi-loss behavior. Temperature is for monitoring and does not turn the pump on or off automatically.
+- Preserves Enterprise Wi-Fi, reconnection, HTTP and Serial pump commands, the 10-second run limit, and stop-on-Wi-Fi-loss behavior. Temperature is for monitoring and does not turn the pump on or off automatically.
 
 Example extra status fields after a valid reading:
 
@@ -63,7 +63,7 @@ The separate GitHub Pages website is unchanged and does not yet display these ex
 
 1. Confirm a plausible temperature appears after startup. Warm the metal probe gently in your hand and verify the reading changes.
 2. Confirm Wi-Fi still connects and the board's page shows both temperature and the pump buttons.
-3. With the pump submerged, test ON, OFF, and automatic shutoff after about 30 seconds while measurements continue. Repeated ON commands must not extend a run.
+3. With the pump submerged, test ON, OFF, and automatic shutoff after about 10 seconds while measurements continue. Repeated ON commands must not extend a run.
 4. Verify Serial commands **1** and **0** still work. Confirm loss of an established Wi-Fi connection stops the pump, as before.
 5. Turn power off, disconnect the sensor, and restart. The sketch should report the sensor missing while Wi-Fi and pump controls remain available. Power down again before reconnecting it and verify readings return after startup.
 6. If readings are unavailable, check the 4.7 kOhm resistor, yellow wire on IO27, red on 3V3, common ground, and the installed libraries. A CRC/bus error or the library's disconnected reading is reported as unavailable rather than a temperature.

@@ -32,7 +32,7 @@
       if (data?.device !== 'garden-assistant-esp32' || data.connected !== true ||
           typeof data.wateringAvailable !== 'boolean' ||
           (data.wateringAvailable && (typeof data.pumpOn !== 'boolean' ||
-            data.maxRunMs !== 30000 || !Number.isFinite(data.remainingMs) ||
+            data.maxRunMs !== 10000 || !Number.isFinite(data.remainingMs) ||
             data.remainingMs < 0 || data.remainingMs > data.maxRunMs))) {
         throw new Error('Board status unrecognized. Upload the updated Wi-Fi sketch.');
       }

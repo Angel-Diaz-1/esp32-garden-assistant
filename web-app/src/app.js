@@ -88,7 +88,7 @@ stopButton.addEventListener('click', async () => {
   } catch (error) {
     if (boardTarget === address) showBoardStatus('disconnected', 'Board unreachable · pump state unknown');
     boardStatusRevision++;
-    wateringStatus.textContent = 'Stop not confirmed. Switch off the pump power supply if needed. The board has a 30-second automatic limit.';
+    wateringStatus.textContent = 'Stop not confirmed. Switch off the pump power supply if needed. The board has a 10-second automatic limit.';
   } finally {
     stoppingPump = false;
     refreshPumpControls();
@@ -156,7 +156,7 @@ waterButton.addEventListener('click', async () => {
       showBoardStatus('connected', 'Board connected · pump ON');
     }
     wateringStatus.textContent = [weatherCheckWarning,
-      `ESP32 at ${address} acknowledged pump ON. It stops automatically within 30 seconds; use Stop pump to finish sooner.`
+      `ESP32 at ${address} acknowledged pump ON. It stops automatically within 10 seconds; use Stop pump to finish sooner.`
     ].filter(Boolean).join(' ');
   } catch (error) {
     if (generation !== actionGeneration) return;
